@@ -1,0 +1,8 @@
+{
+  "name": "CPR Training & Assist (AHA 2025 BLS 3D)",
+  "description": "Interactive AHA 2025 Basic Life Support training with 3D scenario simulations, real-time pose camera tracking, and interactive AED practice.",
+  "requestFeedback": false,
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

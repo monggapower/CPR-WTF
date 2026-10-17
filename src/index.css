@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+@layer base {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Sarabun", "Noto Sans Thai", sans-serif;
+    background-color: #000;
+    color: #fff;
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+}
+
+/* 3D Scenario Canvas */
+#scene3d {
+  touch-action: none;
+  cursor: grab;
+}
+
+#scene3d:active {
+  cursor: grabbing;
+}
