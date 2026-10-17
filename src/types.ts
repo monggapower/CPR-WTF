@@ -41,3 +41,9 @@ export interface BLSCompleted {
   callHelp: boolean;
   aedUsed: boolean;
 }
+
+export interface ClearanceKeywords {
+  iClear: boolean; // ผม/ฉันถอย
+  youClear: boolean; // คุณถอย
+  everybodyClear: boolean; // ทุกคนถอย
+}

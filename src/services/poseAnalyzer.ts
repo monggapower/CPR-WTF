@@ -178,7 +178,13 @@ export class CPRPoseAnalyzer {
     const P = (i: number): Point2D | null => {
       const p = lm[i];
       if (!p) return null;
-      return { x: 1 - p.x, y: 1 - p.y, conf: p.visibility != null ? p.visibility : 0 };
+      const conf =
+        p.visibility != null
+          ? p.visibility
+          : (p as any).score != null
+          ? (p as any).score
+          : 1.0;
+      return { x: 1 - p.x, y: 1 - p.y, conf };
     };
     return {
       leftShoulder: P(11),
@@ -209,11 +215,11 @@ export class CPRPoseAnalyzer {
     this.visibleWrist = w;
     this.visibleHip = side.hip;
 
-    const isTooClose = Math.abs(s.y - w.y) > 0.8;
-    this.isArmStraight = side.armAngle > 155.0;
+    const isTooClose = Math.abs(s.y - w.y) > 0.9;
+    this.isArmStraight = side.armAngle > 140.0;
 
     const xDiff = s.x - w.x;
-    this.isPostureGood = Math.abs(xDiff) < 0.08;
+    this.isPostureGood = Math.abs(xDiff) < 0.14;
 
     if (!this.isPostureGood) {
       this.arrowDirection = xDiff > 0 ? 'left' : 'right';
@@ -224,7 +230,7 @@ export class CPRPoseAnalyzer {
     if (isTooClose) {
       this.resetSideCountdown('⚠️ ใกล้เกินไป! ถอยออกห่าง');
     } else if (!this.isArmStraight) {
-      this.resetSideCountdown('กรุณาล็อกข้อศอกให้ตึง (>160°)');
+      this.resetSideCountdown('กรุณาล็อกข้อศอกให้ตึง (>140°)');
     } else if (!this.isPostureGood) {
       this.resetSideCountdown("โถมตัวตามลูกศร ให้ 'ไหล่ตรงข้อมือ'");
     } else {
@@ -268,12 +274,12 @@ export class CPRPoseAnalyzer {
       !lShoulder ||
       !lElbow ||
       !lWrist ||
-      rShoulder.conf <= 0.15 ||
-      rElbow.conf <= 0.15 ||
-      rWrist.conf <= 0.15 ||
-      lShoulder.conf <= 0.15 ||
-      lElbow.conf <= 0.15 ||
-      lWrist.conf <= 0.15
+      rShoulder.conf <= 0.05 ||
+      rElbow.conf <= 0.05 ||
+      rWrist.conf <= 0.05 ||
+      lShoulder.conf <= 0.05 ||
+      lElbow.conf <= 0.05 ||
+      lWrist.conf <= 0.05
     ) {
       this.resetFrontCountdown('กรุณาหันหน้าเข้ากล้องและเหยียดแขน');
       return;
@@ -289,8 +295,8 @@ export class CPRPoseAnalyzer {
     this.leftElbow = lElbow;
     this.leftWrist = lWrist;
 
-    this.isRightArmStraight = rAngle > 150.0;
-    this.isLeftArmStraight = lAngle > 150.0;
+    this.isRightArmStraight = rAngle > 140.0;
+    this.isLeftArmStraight = lAngle > 140.0;
 
     if (this.isRightArmStraight && this.isLeftArmStraight) {
       this.formFeedbackText = 'แขนตึงคู่! ค้างไว้...';
@@ -316,7 +322,7 @@ export class CPRPoseAnalyzer {
         this.startCPRSessionTimer();
       }
     } else {
-      this.resetFrontCountdown('กรุณาล็อกข้อศอกทั้งสองข้างให้ตรง');
+      this.resetFrontCountdown('กรุณาล็อกข้อศอกทั้งสองข้างให้ตรง (>140°)');
     }
   }
 
@@ -335,12 +341,12 @@ export class CPRPoseAnalyzer {
       !lShoulder ||
       !lElbow ||
       !lWrist ||
-      rShoulder.conf <= 0.15 ||
-      rElbow.conf <= 0.15 ||
-      rWrist.conf <= 0.15 ||
-      lShoulder.conf <= 0.15 ||
-      lElbow.conf <= 0.15 ||
-      lWrist.conf <= 0.15
+      rShoulder.conf <= 0.05 ||
+      rElbow.conf <= 0.05 ||
+      rWrist.conf <= 0.05 ||
+      lShoulder.conf <= 0.05 ||
+      lElbow.conf <= 0.05 ||
+      lWrist.conf <= 0.05
     ) {
       this.clearPoints('กำลังค้นหาผู้ใช้งาน (หันหน้าเข้ากล้อง)');
       return;
@@ -357,8 +363,8 @@ export class CPRPoseAnalyzer {
     this.leftElbow = lElbow;
     this.leftWrist = lWrist;
 
-    this.isRightArmStraight = rAngle > 150.0;
-    this.isLeftArmStraight = lAngle > 150.0;
+    this.isRightArmStraight = rAngle > 140.0;
+    this.isLeftArmStraight = lAngle > 140.0;
     this.isArmStraight = this.isRightArmStraight && this.isLeftArmStraight;
     this.formFeedbackText = this.isArmStraight ? 'แขนตึง: ยอดเยี่ยมทั้งสองข้าง' : '⚠️ แขนงอ! กรุณาล็อกข้อศอก';
 
@@ -482,41 +488,55 @@ export class CPRPoseAnalyzer {
     armAngle: number;
     hasShoulder: boolean;
   } {
+    const leftHasAll =
+      pts.leftShoulder &&
+      pts.leftElbow &&
+      pts.leftWrist &&
+      pts.leftShoulder.conf > 0.05 &&
+      pts.leftElbow.conf > 0.05 &&
+      pts.leftWrist.conf > 0.05;
+
+    const rightHasAll =
+      pts.rightShoulder &&
+      pts.rightElbow &&
+      pts.rightWrist &&
+      pts.rightShoulder.conf > 0.05 &&
+      pts.rightElbow.conf > 0.05 &&
+      pts.rightWrist.conf > 0.05;
+
     const leftConf = (pts.leftShoulder?.conf || 0) + (pts.leftElbow?.conf || 0);
     const rightConf = (pts.rightShoulder?.conf || 0) + (pts.rightElbow?.conf || 0);
-    let leftSize = 0;
-    let rightSize = 0;
-    if (pts.leftShoulder && pts.leftElbow) {
-      leftSize = Math.hypot(pts.leftShoulder.x - pts.leftElbow.x, pts.leftShoulder.y - pts.leftElbow.y);
-    }
-    if (pts.rightShoulder && pts.rightElbow) {
-      rightSize = Math.hypot(pts.rightShoulder.x - pts.rightElbow.x, pts.rightShoulder.y - pts.rightElbow.y);
-    }
 
-    const isLeftCloser = leftConf + leftSize * 5.0 > rightConf + rightSize * 5.0;
-
-    const shoulder = isLeftCloser ? pts.leftShoulder : pts.rightShoulder;
-    const elbow = isLeftCloser ? pts.leftElbow : pts.rightElbow;
-    const wrist = isLeftCloser ? pts.leftWrist : pts.rightWrist;
-
-    if (!shoulder || !elbow || !wrist || shoulder.conf <= 0.15 || elbow.conf <= 0.15 || wrist.conf <= 0.15) {
+    let useLeft = false;
+    if (leftHasAll && rightHasAll) {
+      useLeft = leftConf >= rightConf;
+    } else if (leftHasAll) {
+      useLeft = true;
+    } else if (rightHasAll) {
+      useLeft = false;
+    } else {
+      // Neither has complete joints
       return {
         shoulder: null,
         elbow: null,
         wrist: null,
         hip: null,
         armAngle: 0,
-        hasShoulder: leftConf > 0.15 || rightConf > 0.15,
+        hasShoulder: (pts.leftShoulder?.conf || 0) > 0.05 || (pts.rightShoulder?.conf || 0) > 0.05,
       };
     }
 
-    const hip = isLeftCloser ? pts.leftHip : pts.rightHip;
-    const armAngle = this.calculateAngle(shoulder, elbow, wrist);
+    const shoulder = useLeft ? pts.leftShoulder : pts.rightShoulder;
+    const elbow = useLeft ? pts.leftElbow : pts.rightElbow;
+    const wrist = useLeft ? pts.leftWrist : pts.rightWrist;
+    const hip = useLeft ? pts.leftHip : pts.rightHip;
+    const armAngle = this.calculateAngle(shoulder!, elbow!, wrist!);
+
     return {
       shoulder,
       elbow,
       wrist,
-      hip: hip && hip.conf > 0.15 ? hip : null,
+      hip: hip && hip.conf > 0.05 ? hip : null,
       armAngle,
       hasShoulder: true,
     };

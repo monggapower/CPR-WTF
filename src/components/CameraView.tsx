@@ -12,7 +12,6 @@ interface CameraViewProps {
 export const CameraView: React.FC<CameraViewProps> = ({ mode, analyzer, onPoseResult, onError }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [streamActive, setStreamActive] = useState<boolean>(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
 
   const loopRef = useRef<boolean>(false);
@@ -64,6 +63,7 @@ export const CameraView: React.FC<CameraViewProps> = ({ mode, analyzer, onPoseRe
     if (!r) return;
 
     const A = analyzer;
+    // Map normalized pose landmark to canvas coordinates
     const sx = (p: { x: number; y: number }) => ({ x: r.x + p.x * r.w, y: r.y + (1 - p.y) * r.h });
 
     if (A.appMode === 'sideCalibration') {
@@ -107,17 +107,24 @@ export const CameraView: React.FC<CameraViewProps> = ({ mode, analyzer, onPoseRe
     ctx.lineTo(pts[1].x, pts[1].y);
     ctx.lineTo(pts[2].x, pts[2].y);
     ctx.strokeStyle = straight ? '#34c759' : '#ff3b30';
-    ctx.lineWidth = 6;
+    ctx.lineWidth = 7;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.stroke();
   };
 
   const drawJoints = (ctx: CanvasRenderingContext2D, pts: { x: number; y: number }[]) => {
-    ctx.fillStyle = '#ffcc00';
     pts.forEach((p) => {
+      // Glow ring
       ctx.beginPath();
-      ctx.arc(p.x, p.y, 7.5, 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, 11, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255, 204, 0, 0.35)';
+      ctx.fill();
+
+      // Solid joint dot
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 7, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffcc00';
       ctx.fill();
     });
   };
@@ -140,9 +147,60 @@ export const CameraView: React.FC<CameraViewProps> = ({ mode, analyzer, onPoseRe
 
   const drawDot = (ctx: CanvasRenderingContext2D, p: { x: number; y: number }) => {
     ctx.beginPath();
-    ctx.arc(p.x, p.y, 7.5, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, 7, 0, Math.PI * 2);
     ctx.fillStyle = '#ffcc00';
     ctx.fill();
+  };
+
+  const ensurePoseDetector = (): Promise<any> => {
+    return new Promise((resolve) => {
+      if (poseRef.current) return resolve(poseRef.current);
+
+      const checkOrInit = () => {
+        const PoseConstructor = (window as any).Pose;
+        if (PoseConstructor) {
+          try {
+            const pose = new PoseConstructor({
+              locateFile: (file: string) =>
+                `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675466862/${file}`,
+            });
+            pose.setOptions({
+              modelComplexity: 1,
+              smoothLandmarks: true,
+              enableSegmentation: false,
+              smoothSegmentation: false,
+              minDetectionConfidence: 0.4,
+              minTrackingConfidence: 0.4,
+            });
+            pose.onResults((results: any) => {
+              if (!loopRef.current) return;
+              const landmarks = results?.poseLandmarks?.length ? results.poseLandmarks : null;
+              analyzer.processFrame(landmarks);
+              onPoseResult();
+              drawOverlay();
+            });
+            poseRef.current = pose;
+            resolve(pose);
+            return true;
+          } catch (e) {
+            console.error('Error initializing MediaPipe Pose:', e);
+          }
+        }
+        return false;
+      };
+
+      if (checkOrInit()) return;
+
+      // Poll until window.Pose becomes available
+      const interval = setInterval(() => {
+        if (checkOrInit()) {
+          clearInterval(interval);
+        }
+      }, 250);
+
+      // Timeout after 12 seconds
+      setTimeout(() => clearInterval(interval), 12000);
+    });
   };
 
   useEffect(() => {
@@ -155,7 +213,6 @@ export const CameraView: React.FC<CameraViewProps> = ({ mode, analyzer, onPoseRe
       if (videoRef.current) {
         videoRef.current.srcObject = null;
       }
-      setStreamActive(false);
       return;
     }
 
@@ -165,7 +222,11 @@ export const CameraView: React.FC<CameraViewProps> = ({ mode, analyzer, onPoseRe
       try {
         setCameraError(null);
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+          video: {
+            facingMode: 'user',
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
           audio: false,
         });
 
@@ -175,37 +236,20 @@ export const CameraView: React.FC<CameraViewProps> = ({ mode, analyzer, onPoseRe
         }
 
         streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
+        const video = videoRef.current;
+        if (video) {
+          video.srcObject = stream;
+          video.onloadedmetadata = () => {
+            updateRect();
+          };
           try {
-            await videoRef.current.play();
+            await video.play();
+            updateRect();
           } catch (e) {}
         }
-        setStreamActive(true);
 
-        // Load Pose detector if available on window
-        const PoseConstructor = (window as any).Pose;
-        if (PoseConstructor && !poseRef.current) {
-          const pose = new PoseConstructor({
-            locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`,
-          });
-          pose.setOptions({
-            modelComplexity: 1,
-            smoothLandmarks: true,
-            enableSegmentation: false,
-            smoothSegmentation: false,
-            minDetectionConfidence: 0.5,
-            minTrackingConfidence: 0.5,
-          });
-          pose.onResults((results: any) => {
-            if (!loopRef.current) return;
-            const landmarks = results?.poseLandmarks?.length ? results.poseLandmarks : null;
-            analyzer.processFrame(landmarks);
-            onPoseResult();
-            drawOverlay();
-          });
-          poseRef.current = pose;
-        }
+        // Initialize Pose model
+        await ensurePoseDetector();
 
         updateRect();
         loopRef.current = true;
@@ -220,12 +264,21 @@ export const CameraView: React.FC<CameraViewProps> = ({ mode, analyzer, onPoseRe
     const startDetectionLoop = async () => {
       while (loopRef.current) {
         const video = videoRef.current;
-        if (video && video.readyState >= 2 && video.currentTime !== lastTimeRef.current) {
-          lastTimeRef.current = video.currentTime;
-          if (poseRef.current) {
-            try {
-              await poseRef.current.send({ image: video });
-            } catch (e) {}
+        if (video && video.readyState >= 2) {
+          if (!rectRef.current && video.videoWidth > 0) {
+            updateRect();
+          }
+
+          if (video.currentTime !== lastTimeRef.current) {
+            lastTimeRef.current = video.currentTime;
+            if (poseRef.current) {
+              try {
+                await poseRef.current.send({ image: video });
+              } catch (e) {}
+            } else {
+              // Retry init
+              ensurePoseDetector();
+            }
           }
         }
         await new Promise((r) => requestAnimationFrame(r));
@@ -274,7 +327,7 @@ export const CameraView: React.FC<CameraViewProps> = ({ mode, analyzer, onPoseRe
         }`}
       />
       {cameraError && isCameraMode && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-red-600/90 text-white px-5 py-3 rounded-xl backdrop-blur-md shadow-xl text-center text-sm font-semibold max-w-md">
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-red-600/90 text-white px-5 py-3 rounded-2xl backdrop-blur-md shadow-2xl text-center text-sm font-semibold max-w-md border border-white/20">
           {cameraError}
         </div>
       )}

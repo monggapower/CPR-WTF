@@ -396,7 +396,7 @@ export const BLS3DScene: React.FC<BLS3DSceneProps> = ({
           (S.socketMesh.material as THREE.MeshStandardMaterial).emissive.setHex(0x000000);
         }
 
-        if (step === 5 && S.shockBtn) {
+        if (step === 6 && S.shockBtn) {
           const s = 1 + 0.25 * Math.sin(t * 4.5);
           S.shockBtn.scale.set(s, 1, s);
           (S.shockBtn.material as THREE.MeshStandardMaterial).emissive.setHex(
@@ -488,10 +488,10 @@ export const BLS3DScene: React.FC<BLS3DSceneProps> = ({
               } catch (e) {}
             }
           }
-        } else if (step === 5 && S.shockBtn) {
+        } else if (step === 6 && S.shockBtn) {
           const hits = S.raycaster.intersectObject(S.shockBtn, false);
           if (hits.length > 0) {
-            onAdvanceAED(6);
+            onAdvanceAED(7);
           }
         }
       }
@@ -643,8 +643,8 @@ export const BLS3DScene: React.FC<BLS3DSceneProps> = ({
     } else if (mode === 'aedScenario') {
       if (S.aedGroup) S.aedGroup.visible = true;
       if (S.bareChestMesh) S.bareChestMesh.visible = true;
-      S.camera.position.set(0.35, 2.85, 1.15);
-      S.camera.lookAt(0.35, 0.2, -0.05);
+      S.camera.position.set(0.25, 3.2, 1.55);
+      S.camera.lookAt(0.25, 0.2, 0);
 
       // Configure AED state
       if (aedStep === 0) {
@@ -666,8 +666,13 @@ export const BLS3DScene: React.FC<BLS3DSceneProps> = ({
         } else if (aedStep === 4) {
           if (S.aedScreenMesh) (S.aedScreenMesh.material as THREE.MeshBasicMaterial).color.setHex(0x38bdf8);
         } else if (aedStep === 5) {
+          // Waiting for safety clearance
+          if (S.aedScreenMesh) (S.aedScreenMesh.material as THREE.MeshBasicMaterial).color.setHex(0xfbbf24);
+        } else if (aedStep === 6) {
+          // Safety cleared, shock ready
           if (S.aedScreenMesh) (S.aedScreenMesh.material as THREE.MeshBasicMaterial).color.setHex(0xf97316);
-        } else if (aedStep >= 6) {
+        } else if (aedStep >= 7) {
+          // Shock delivered
           if (S.aedScreenMesh) (S.aedScreenMesh.material as THREE.MeshBasicMaterial).color.setHex(0x22c55e);
         }
       }

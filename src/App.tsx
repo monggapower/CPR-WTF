@@ -34,8 +34,19 @@ export const App: React.FC = () => {
     unconscious: false,
     requestAED: false,
   });
+  const [clearanceKeywords, setClearanceKeywords] = useState<{
+    iClear: boolean;
+    youClear: boolean;
+    everybodyClear: boolean;
+  }>({
+    iClear: false,
+    youClear: false,
+    everybodyClear: false,
+  });
   const [transcript, setTranscript] = useState<string>('');
   const [aedStep, setAedStep] = useState<number>(0);
+  const aedStepRef = useRef<number>(0);
+  aedStepRef.current = aedStep;
 
   // Re-render trigger when analyzer state changes (e.g. countdowns, angles, CPM)
   const [, setTick] = useState<number>(0);
@@ -107,6 +118,49 @@ export const App: React.FC = () => {
         }
         if (next.call1669 && next.unconscious && next.requestAED) {
           setTimeout(() => completeCallHelp(), 500);
+        }
+        return next;
+      });
+    } else if (currentMode === 'aedScenario' && aedStepRef.current === 5) {
+      let updated = false;
+      setClearanceKeywords((prev) => {
+        const next = { ...prev };
+        if (
+          !next.iClear &&
+          (norm.includes('ผมถอย') || norm.includes('ฉันถอย') || norm.includes('เราถอย'))
+        ) {
+          next.iClear = true;
+          updated = true;
+        }
+        if (!next.youClear && (norm.includes('คุณถอย') || norm.includes('ท่านถอย'))) {
+          next.youClear = true;
+          updated = true;
+        }
+        if (
+          !next.everybodyClear &&
+          (norm.includes('ทุกคนถอย') || norm.includes('พวกเราถอย') || norm.includes('คนอื่นถอย'))
+        ) {
+          next.everybodyClear = true;
+          updated = true;
+        }
+        if (
+          norm.includes('ผมถอยคุณถอยทุกคนถอย') ||
+          norm.includes('ฉันถอยคุณถอยทุกคนถอย') ||
+          (norm.includes('ถอย') && (norm.includes('ผม') || norm.includes('ฉัน')) && norm.includes('คุณ') && norm.includes('ทุกคน'))
+        ) {
+          next.iClear = true;
+          next.youClear = true;
+          next.everybodyClear = true;
+          updated = true;
+        }
+        if (updated) {
+          soundRef.current.tick();
+        }
+        if (next.iClear && next.youClear && next.everybodyClear) {
+          soundRef.current.success();
+          setTimeout(() => {
+            advanceAEDStep(6);
+          }, 600);
         }
         return next;
       });
@@ -247,8 +301,17 @@ export const App: React.FC = () => {
         advanceAEDStep(5);
       }, 3000);
     } else if (nextStep === 5) {
+      // Step 5: Safety clearance voice prompt
       soundRef.current.success();
+      setTranscript('');
+      setClearanceKeywords({ iClear: false, youClear: false, everybodyClear: false });
+      startListening();
     } else if (nextStep === 6) {
+      // Step 6: Clearance verified, shock button unlocked
+      soundRef.current.success();
+      stopListening();
+    } else if (nextStep === 7) {
+      // Step 7: Shock delivered
       soundRef.current.success();
       analyzerRef.current.blsCompleted.aedUsed = true;
       setTimeout(() => {
@@ -256,6 +319,14 @@ export const App: React.FC = () => {
         analyzerRef.current.notify();
       }, 1800);
     }
+  };
+
+  const completeSafetyClearance = () => {
+    setClearanceKeywords({ iClear: true, youClear: true, everybodyClear: true });
+    soundRef.current.success();
+    setTimeout(() => {
+      advanceAEDStep(6);
+    }, 400);
   };
 
   const handleReturnHome = () => {
@@ -374,7 +445,13 @@ export const App: React.FC = () => {
       )}
 
       {mode === 'aedScenario' && (
-        <HUDStep5AED aedStep={aedStep} onAdvanceStep={advanceAEDStep} />
+        <HUDStep5AED
+          aedStep={aedStep}
+          clearanceKeywords={clearanceKeywords}
+          transcript={transcript}
+          onAdvanceStep={advanceAEDStep}
+          onSimulateClearance={completeSafetyClearance}
+        />
       )}
 
       {mode === 'summary' && (
