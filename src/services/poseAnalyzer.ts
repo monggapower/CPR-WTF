@@ -316,10 +316,14 @@ export class CPRPoseAnalyzer {
       }
 
       if (elapsed >= 3.0) {
-        this.appMode = 'activeCPR';
         this.frontStartTime = null;
         this.arrowDirection = null;
-        this.startCPRSessionTimer();
+        if (this.sessionType === 'training') {
+          this.appMode = 'handPlacement';
+        } else {
+          this.appMode = 'activeCPR';
+          this.startCPRSessionTimer();
+        }
       }
     } else {
       this.resetFrontCountdown('กรุณาล็อกข้อศอกทั้งสองข้างให้ตรง (>140°)');

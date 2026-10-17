@@ -134,6 +134,52 @@ export const HUDStep5AED: React.FC<HUDStep5AEDProps> = ({
           {stepMessages[aedStep] || ''}
         </p>
 
+        {/* Step-specific Direct Action Button */}
+        {aedStep === 0 && (
+          <button
+            onClick={() => onAdvanceStep(1)}
+            className="mt-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-1.5 px-5 rounded-xl shadow transition-all"
+          >
+            ⏻ แตะเปิดเครื่อง AED (หรือกดปุ่มเขียวบน 3D)
+          </button>
+        )}
+
+        {aedStep === 1 && (
+          <button
+            onClick={() => onAdvanceStep(2)}
+            className="mt-2 bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs py-1.5 px-5 rounded-xl shadow transition-all"
+          >
+            📍 วางแผ่นที่ 1 บนอกขวาบน (ใต้ไหปลาร้า)
+          </button>
+        )}
+
+        {aedStep === 2 && (
+          <button
+            onClick={() => onAdvanceStep(3)}
+            className="mt-2 bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs py-1.5 px-5 rounded-xl shadow transition-all"
+          >
+            📍 วางแผ่นที่ 2 บนชายโครงซ้ายล่าง
+          </button>
+        )}
+
+        {aedStep === 3 && (
+          <button
+            onClick={() => onAdvanceStep(4)}
+            className="mt-2 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs py-1.5 px-5 rounded-xl shadow transition-all"
+          >
+            🔌 เสียบขั้วสายสีเหลืองเข้าเครื่อง AED
+          </button>
+        )}
+
+        {aedStep === 6 && (
+          <button
+            onClick={() => onAdvanceStep(7)}
+            className="mt-2 bg-rose-600 hover:bg-rose-500 text-white font-black text-sm py-2 px-6 rounded-xl shadow-xl shadow-rose-950/60 border border-rose-400 animate-pulse transition-all"
+          >
+            ⚡ กดปุ่ม SHOCK ทำการช็อกไฟฟ้า (หรือคลิกปุ่มส้มบน 3D)
+          </button>
+        )}
+
         {/* Special Safety Clearance Section (Step 5) */}
         {aedStep === 5 && (
           <div className="mt-2.5 pt-2 border-t border-white/15 flex flex-col items-center gap-2">

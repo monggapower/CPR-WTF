@@ -6,6 +6,7 @@ export type AppMode =
   | 'sideCalibration'
   | 'transitionSideToFront'
   | 'frontCalibration'
+  | 'handPlacement'
   | 'activeCPR'
   | 'aedScenario'
   | 'summary';

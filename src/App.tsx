@@ -11,6 +11,7 @@ import { HUDStep1SceneSafety } from './components/HUDStep1SceneSafety';
 import { HUDStep2CheckResponse } from './components/HUDStep2CheckResponse';
 import { HUDStep3CallHelp } from './components/HUDStep3CallHelp';
 import { HUDStep4Calibration } from './components/HUDStep4Calibration';
+import { HUDStep4HandPlacement } from './components/HUDStep4HandPlacement';
 import { HUDActiveCPR } from './components/HUDActiveCPR';
 import { HUDStep5AED } from './components/HUDStep5AED';
 import { SummaryScreen } from './components/SummaryScreen';
@@ -55,7 +56,13 @@ export const App: React.FC = () => {
   const recognitionRef = useRef<any>(null);
 
   const THREE_MODES: AppMode[] = ['blsSceneSafety', 'blsCheckResponse', 'blsCallHelp', 'aedScenario'];
-  const CAMERA_MODES: AppMode[] = ['sideCalibration', 'transitionSideToFront', 'frontCalibration', 'activeCPR'];
+  const CAMERA_MODES: AppMode[] = [
+    'sideCalibration',
+    'transitionSideToFront',
+    'frontCalibration',
+    'handPlacement',
+    'activeCPR',
+  ];
 
   // Initialize Speech Recognition
   useEffect(() => {
@@ -424,6 +431,20 @@ export const App: React.FC = () => {
             analyzerRef.current.notify();
           }}
           onSimulateFrontPass={() => {
+            if (analyzerRef.current.sessionType === 'training') {
+              analyzerRef.current.appMode = 'handPlacement';
+            } else {
+              analyzerRef.current.appMode = 'activeCPR';
+              analyzerRef.current.startCPRSessionTimer();
+            }
+            analyzerRef.current.notify();
+          }}
+        />
+      )}
+
+      {mode === 'handPlacement' && (
+        <HUDStep4HandPlacement
+          onConfirmStartCPR={() => {
             analyzerRef.current.appMode = 'activeCPR';
             analyzerRef.current.startCPRSessionTimer();
             analyzerRef.current.notify();

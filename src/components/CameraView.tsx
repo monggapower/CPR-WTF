@@ -20,7 +20,13 @@ export const CameraView: React.FC<CameraViewProps> = ({ mode, analyzer, onPoseRe
   const rectRef = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
   const lastTimeRef = useRef<number>(-1);
 
-  const isCameraMode = ['sideCalibration', 'transitionSideToFront', 'frontCalibration', 'activeCPR'].includes(mode);
+  const isCameraMode = [
+    'sideCalibration',
+    'transitionSideToFront',
+    'frontCalibration',
+    'handPlacement',
+    'activeCPR',
+  ].includes(mode);
 
   const updateRect = () => {
     const video = videoRef.current;
@@ -162,7 +168,7 @@ export const CameraView: React.FC<CameraViewProps> = ({ mode, analyzer, onPoseRe
           try {
             const pose = new PoseConstructor({
               locateFile: (file: string) =>
-                `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675466862/${file}`,
+                `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/${file}`,
             });
             pose.setOptions({
               modelComplexity: 1,
