@@ -128,24 +128,24 @@ export const App: React.FC = () => {
         }
         return next;
       });
-    } else if (currentMode === 'aedScenario' && aedStepRef.current === 5) {
+    } else if (currentMode === 'aedScenario' && aedStepRef.current === 4) {
       let updated = false;
       setClearanceKeywords((prev) => {
         const next = { ...prev };
         if (
           !next.iClear &&
-          (norm.includes('ผมถอย') || norm.includes('ฉันถอย') || norm.includes('เราถอย'))
+          (norm.includes('ผมถอย') || norm.includes('ฉันถอย') || norm.includes('เราถอย') || norm.includes('ถอย'))
         ) {
           next.iClear = true;
           updated = true;
         }
-        if (!next.youClear && (norm.includes('คุณถอย') || norm.includes('ท่านถอย'))) {
+        if (!next.youClear && (norm.includes('คุณถอย') || norm.includes('ท่านถอย') || norm.includes('คุณ'))) {
           next.youClear = true;
           updated = true;
         }
         if (
           !next.everybodyClear &&
-          (norm.includes('ทุกคนถอย') || norm.includes('พวกเราถอย') || norm.includes('คนอื่นถอย'))
+          (norm.includes('ทุกคนถอย') || norm.includes('พวกเราถอย') || norm.includes('คนอื่นถอย') || norm.includes('ทุกคน'))
         ) {
           next.everybodyClear = true;
           updated = true;
@@ -153,7 +153,7 @@ export const App: React.FC = () => {
         if (
           norm.includes('ผมถอยคุณถอยทุกคนถอย') ||
           norm.includes('ฉันถอยคุณถอยทุกคนถอย') ||
-          (norm.includes('ถอย') && (norm.includes('ผม') || norm.includes('ฉัน')) && norm.includes('คุณ') && norm.includes('ทุกคน'))
+          (norm.includes('ถอย') && (norm.includes('ผม') || norm.includes('ฉัน')) && (norm.includes('คุณ') || norm.includes('ทุกคน')))
         ) {
           next.iClear = true;
           next.youClear = true;
@@ -166,7 +166,7 @@ export const App: React.FC = () => {
         if (next.iClear && next.youClear && next.everybodyClear) {
           soundRef.current.success();
           setTimeout(() => {
-            advanceAEDStep(6);
+            advanceAEDStep(5);
           }, 600);
         }
         return next;
@@ -260,6 +260,7 @@ export const App: React.FC = () => {
       setCallKeywords({ call1669: false, unconscious: false, requestAED: false });
     } else if (currentMode === 'aedScenario') {
       setAedStep(0);
+      playAEDVoicePrompt(0);
     }
   }, [mode]);
 
@@ -296,35 +297,84 @@ export const App: React.FC = () => {
     }, 900);
   };
 
+  /**
+   * Thai AED Voice Over instruction using Web Speech Synthesis API
+   * Authentically replicating Thai clinical automated external defibrillator prompts
+   */
+  const playAEDVoicePrompt = (step: number) => {
+    switch (step) {
+      case 0:
+        soundRef.current.speakThai(
+          'เปิดเครื่อง เออีดี... กำลังเริ่มต้นระบบ... ติดแผ่นนำไฟฟ้าบนหน้าอกที่เปลือยเปล่าของผู้ป่วย'
+        );
+        break;
+      case 1:
+        soundRef.current.speakThai(
+          'ติดแผ่นนำไฟฟ้าแผ่นแรก ที่บริเวณหน้าอกขวาด้านบน ใต้กระดูกไหปลาร้า'
+        );
+        break;
+      case 2:
+        soundRef.current.speakThai(
+          'ติดแผ่นนำไฟฟ้าแผ่นที่สอง ที่บริเวณชายโครงซ้ายด้านล่าง'
+        );
+        break;
+      case 3:
+        soundRef.current.heartbeat();
+        soundRef.current.speakThai(
+          'กำลังวิเคราะห์คลื่นไฟฟ้าหัวใจ... ห้ามสัมผัสตัวผู้ป่วย!'
+        );
+        break;
+      case 4:
+        soundRef.current.chargeSiren();
+        soundRef.current.speakThai(
+          'แนะนำให้ทำการช็อก! กำลังชาร์จพลังงาน... ทุกคนถอยห่างจากตัวผู้ป่วย พูดเตือนว่า ผมถอย คุณถอย ทุกคนถอย'
+        );
+        break;
+      case 5:
+        soundRef.current.speakThai(
+          'พร้อมทำการช็อก! กดปุ่มช็อกสีส้มที่กำลังกระพริบเดี๋ยวนี้!'
+        );
+        break;
+      case 6:
+        soundRef.current.shockDischarge();
+        soundRef.current.speakThai(
+          'ทำการช็อกเรียบร้อยแล้ว ปลอดภัยในการสัมผัสตัวผู้ป่วย เริ่มทำการกดหน้าอก CPR ต่อเนื่องทันที'
+        );
+        break;
+    }
+  };
+
   const advanceAEDStep = (nextStep: number) => {
     setAedStep(nextStep);
     soundRef.current.tick();
+    playAEDVoicePrompt(nextStep);
 
-    if (nextStep === 2 || nextStep === 3) {
+    if (nextStep === 1 || nextStep === 2) {
       soundRef.current.success();
-    } else if (nextStep === 4) {
+    } else if (nextStep === 3) {
+      // Step 3: Automated ECG Rhythm Analysis (3.5 seconds)
       soundRef.current.success();
       setTimeout(() => {
-        advanceAEDStep(5);
-      }, 3000);
-    } else if (nextStep === 5) {
-      // Step 5: Safety clearance voice prompt
+        advanceAEDStep(4);
+      }, 3500);
+    } else if (nextStep === 4) {
+      // Step 4: Safety clearance voice prompt ("ผม/ฉันถอย คุณถอย ทุกคนถอย")
       soundRef.current.success();
       setTranscript('');
       setClearanceKeywords({ iClear: false, youClear: false, everybodyClear: false });
       startListening();
-    } else if (nextStep === 6) {
-      // Step 6: Clearance verified, shock button unlocked
+    } else if (nextStep === 5) {
+      // Step 5: Safety clearance verified, shock button unlocked & flashing!
       soundRef.current.success();
       stopListening();
-    } else if (nextStep === 7) {
-      // Step 7: Shock delivered
+    } else if (nextStep === 6) {
+      // Step 6: Shock delivered
       soundRef.current.success();
       analyzerRef.current.blsCompleted.aedUsed = true;
       setTimeout(() => {
         analyzerRef.current.appMode = 'summary';
         analyzerRef.current.notify();
-      }, 1800);
+      }, 2200);
     }
   };
 
@@ -332,7 +382,7 @@ export const App: React.FC = () => {
     setClearanceKeywords({ iClear: true, youClear: true, everybodyClear: true });
     soundRef.current.success();
     setTimeout(() => {
-      advanceAEDStep(6);
+      advanceAEDStep(5);
     }, 400);
   };
 
@@ -472,6 +522,7 @@ export const App: React.FC = () => {
           transcript={transcript}
           onAdvanceStep={advanceAEDStep}
           onSimulateClearance={completeSafetyClearance}
+          onReplayVoice={() => playAEDVoicePrompt(aedStep)}
         />
       )}
 

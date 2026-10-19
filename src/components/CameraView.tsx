@@ -70,7 +70,7 @@ export const CameraView: React.FC<CameraViewProps> = ({ mode, analyzer, onPoseRe
 
     const A = analyzer;
     // Map normalized pose landmark to canvas coordinates
-    const sx = (p: { x: number; y: number }) => ({ x: r.x + p.x * r.w, y: r.y + (1 - p.y) * r.h });
+    const sx = (p: { x: number; y: number }) => ({ x: r.x + p.x * r.w, y: r.y + p.y * r.h });
 
     if (A.appMode === 'sideCalibration') {
       const s = A.visibleShoulder ? sx(A.visibleShoulder) : null;
@@ -268,21 +268,31 @@ export const CameraView: React.FC<CameraViewProps> = ({ mode, analyzer, onPoseRe
     };
 
     const startDetectionLoop = async () => {
+      let isSending = false;
+      let lastSendTimestamp = 0;
+
       while (loopRef.current) {
         const video = videoRef.current;
-        if (video && video.readyState >= 2) {
-          if (!rectRef.current && video.videoWidth > 0) {
+        const now = performance.now();
+
+        if (video && video.readyState >= 2 && video.videoWidth > 0) {
+          if (!rectRef.current) {
             updateRect();
           }
 
-          if (video.currentTime !== lastTimeRef.current) {
-            lastTimeRef.current = video.currentTime;
+          // Process frame every ~33ms (up to 30 FPS) for smooth real-time tracking
+          if (!isSending && now - lastSendTimestamp >= 30) {
+            lastSendTimestamp = now;
             if (poseRef.current) {
+              isSending = true;
               try {
                 await poseRef.current.send({ image: video });
-              } catch (e) {}
+              } catch (e) {
+                console.warn('Pose send error:', e);
+              } finally {
+                isSending = false;
+              }
             } else {
-              // Retry init
               ensurePoseDetector();
             }
           }

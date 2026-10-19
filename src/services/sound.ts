@@ -56,4 +56,115 @@ export class SoundFX {
       osc.stop(t + delay + 0.45);
     });
   }
+
+  /** AED Capacitor Charging Tone (Rising Pitch Siren) */
+  chargeSiren(): void {
+    const ctx = this.ensure();
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(450, t);
+    osc.frequency.exponentialRampToValueAtTime(1400, t + 2.5);
+    gain.gain.setValueAtTime(0.001, t);
+    gain.gain.linearRampToValueAtTime(0.12, t + 0.3);
+    gain.gain.linearRampToValueAtTime(0.12, t + 2.4);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 2.7);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 2.8);
+  }
+
+  /** AED Defibrillation Electric Shock Discharge Sound */
+  shockDischarge(): void {
+    const ctx = this.ensure();
+    if (!ctx) return;
+    const t = ctx.currentTime;
+
+    // Heavy low frequency thump
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(150, t);
+    osc.frequency.exponentialRampToValueAtTime(30, t + 0.45);
+    gain.gain.setValueAtTime(0.35, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.55);
+
+    // Electric zap click
+    const zapOsc = ctx.createOscillator();
+    const zapGain = ctx.createGain();
+    zapOsc.type = 'sawtooth';
+    zapOsc.frequency.setValueAtTime(2200, t);
+    zapOsc.frequency.exponentialRampToValueAtTime(200, t + 0.2);
+    zapGain.gain.setValueAtTime(0.2, t);
+    zapGain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+    zapOsc.connect(zapGain);
+    zapGain.connect(ctx.destination);
+    zapOsc.start(t);
+    zapOsc.stop(t + 0.25);
+  }
+
+  /** Heart ECG rhythm beep */
+  heartbeat(): void {
+    const ctx = this.ensure();
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(950, t);
+    gain.gain.setValueAtTime(0.06, t);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.1);
+  }
+
+  /**
+   * Thai AED Voice Over instruction using Web Speech Synthesis API
+   * with automatic Thai voice selection and graceful fallback
+   */
+  speakThai(text: string, onEnd?: () => void): void {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      if (onEnd) onEnd();
+      return;
+    }
+
+    try {
+      window.speechSynthesis.cancel(); // Cancel any previous utterance
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'th-TH';
+      utterance.rate = 0.98; // Clear pedagogical speech rate for emergency instructions
+      utterance.pitch = 1.05;
+      utterance.volume = 1.0;
+
+      // Select Thai voice if available
+      const voices = window.speechSynthesis.getVoices();
+      const thaiVoice = voices.find(
+        (v) => v.lang.toLowerCase().includes('th') || v.lang.toLowerCase().includes('thai')
+      );
+      if (thaiVoice) {
+        utterance.voice = thaiVoice;
+      }
+
+      if (onEnd) {
+        utterance.onend = () => onEnd();
+        utterance.onerror = () => onEnd();
+      }
+
+      window.speechSynthesis.speak(utterance);
+    } catch (e) {
+      console.warn('Speech synthesis error:', e);
+      if (onEnd) onEnd();
+    }
+  }
 }
+

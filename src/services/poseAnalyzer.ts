@@ -156,6 +156,10 @@ export class CPRPoseAnalyzer {
     return Math.round((this.qualityCompressions / this.totalCompressions) * 100);
   }
 
+  // Frame debounce counters to avoid jitter resets
+  private sideBadFrameCount: number = 0;
+  private frontBadFrameCount: number = 0;
+
   processFrame(landmarks: Array<{ x: number; y: number; visibility?: number }> | null): void {
     if (!['sideCalibration', 'frontCalibration', 'activeCPR'].includes(this.appMode)) return;
 
@@ -183,8 +187,9 @@ export class CPRPoseAnalyzer {
           ? p.visibility
           : (p as any).score != null
           ? (p as any).score
-          : 1.0;
-      return { x: 1 - p.x, y: 1 - p.y, conf };
+          : 0.8;
+      // Normalization: mirrored X (0=left, 1=right on screen), natural Y (0=top, 1=bottom)
+      return { x: 1 - p.x, y: p.y, conf };
     };
     return {
       leftShoulder: P(11),
@@ -205,8 +210,11 @@ export class CPRPoseAnalyzer {
     const w = side.wrist;
 
     if (!s || !e || !w) {
-      this.resetSideCountdown(side.hasShoulder ? '⚠️ ขยับกล้องให้เห็นข้อมือ' : 'กรุณาหันด้านข้างเข้ากล้อง');
-      this.arrowDirection = null;
+      this.sideBadFrameCount++;
+      if (this.sideBadFrameCount > 10) {
+        this.resetSideCountdown(side.hasShoulder ? '⚠️ ขยับกล้องให้เห็นข้อมือ' : 'กรุณาหันด้านข้างเข้ากล้อง');
+        this.arrowDirection = null;
+      }
       return;
     }
 
@@ -215,26 +223,34 @@ export class CPRPoseAnalyzer {
     this.visibleWrist = w;
     this.visibleHip = side.hip;
 
-    const isTooClose = Math.abs(s.y - w.y) > 0.9;
-    this.isArmStraight = side.armAngle > 140.0;
+    // Generous and realistic clinical thresholds
+    this.isArmStraight = side.armAngle > 130.0;
 
     const xDiff = s.x - w.x;
-    this.isPostureGood = Math.abs(xDiff) < 0.14;
+    // Good posture when shoulder is vertically aligned above wrists (within tolerance)
+    this.isPostureGood = Math.abs(xDiff) < 0.20;
 
     if (!this.isPostureGood) {
-      this.arrowDirection = xDiff > 0 ? 'left' : 'right';
+      this.arrowDirection = xDiff > 0.08 ? 'left' : (xDiff < -0.08 ? 'right' : null);
     } else {
       this.arrowDirection = null;
     }
 
-    if (isTooClose) {
-      this.resetSideCountdown('⚠️ ใกล้เกินไป! ถอยออกห่าง');
-    } else if (!this.isArmStraight) {
-      this.resetSideCountdown('กรุณาล็อกข้อศอกให้ตึง (>140°)');
+    if (!this.isArmStraight) {
+      this.sideBadFrameCount++;
+      if (this.sideBadFrameCount > 10) {
+        this.resetSideCountdown('กรุณาล็อกข้อศอกให้ตึง (>130°)');
+      }
     } else if (!this.isPostureGood) {
-      this.resetSideCountdown("โถมตัวตามลูกศร ให้ 'ไหล่ตรงข้อมือ'");
+      this.sideBadFrameCount++;
+      if (this.sideBadFrameCount > 10) {
+        this.resetSideCountdown("โถมตัวตามลูกศร ให้ 'ไหล่ตรงข้อมือ'");
+      }
     } else {
+      // Good posture frame!
+      this.sideBadFrameCount = 0;
       this.formFeedbackText = 'ท่าทางถูกต้อง! ค้างไว้...';
+
       if (this.sideStartTime === null) {
         this.sideStartTime = Date.now();
         this.sideCountdown = 3;
@@ -260,45 +276,38 @@ export class CPRPoseAnalyzer {
   }
 
   private runFrontCalibration(pts: PoseLandmarks): void {
-    const rShoulder = pts.leftShoulder;
-    const rElbow = pts.leftElbow;
-    const rWrist = pts.leftWrist;
-    const lShoulder = pts.rightShoulder;
-    const lElbow = pts.rightElbow;
-    const lWrist = pts.rightWrist;
+    const rShoulder = pts.rightShoulder || pts.leftShoulder;
+    const rElbow = pts.rightElbow || pts.leftElbow;
+    const rWrist = pts.rightWrist || pts.leftWrist;
+    const lShoulder = pts.leftShoulder || pts.rightShoulder;
+    const lElbow = pts.leftElbow || pts.rightElbow;
+    const lWrist = pts.leftWrist || pts.rightWrist;
 
-    if (
-      !rShoulder ||
-      !rElbow ||
-      !rWrist ||
-      !lShoulder ||
-      !lElbow ||
-      !lWrist ||
-      rShoulder.conf <= 0.05 ||
-      rElbow.conf <= 0.05 ||
-      rWrist.conf <= 0.05 ||
-      lShoulder.conf <= 0.05 ||
-      lElbow.conf <= 0.05 ||
-      lWrist.conf <= 0.05
-    ) {
-      this.resetFrontCountdown('กรุณาหันหน้าเข้ากล้องและเหยียดแขน');
+    if (!rShoulder || !rElbow || !rWrist) {
+      this.frontBadFrameCount++;
+      if (this.frontBadFrameCount > 10) {
+        this.resetFrontCountdown('กรุณาหันหน้าเข้ากล้องและเหยียดแขน');
+      }
       return;
     }
 
     const rAngle = this.calculateAngle(rShoulder, rElbow, rWrist);
-    const lAngle = this.calculateAngle(lShoulder, lElbow, lWrist);
+    const lAngle = lShoulder && lElbow && lWrist ? this.calculateAngle(lShoulder, lElbow, lWrist) : rAngle;
 
-    this.rightShoulder = rShoulder;
-    this.rightElbow = rElbow;
-    this.rightWrist = rWrist;
-    this.leftShoulder = lShoulder;
-    this.leftElbow = lElbow;
-    this.leftWrist = lWrist;
+    this.rightShoulder = pts.rightShoulder;
+    this.rightElbow = pts.rightElbow;
+    this.rightWrist = pts.rightWrist;
+    this.leftShoulder = pts.leftShoulder;
+    this.leftElbow = pts.leftElbow;
+    this.leftWrist = pts.leftWrist;
 
-    this.isRightArmStraight = rAngle > 140.0;
-    this.isLeftArmStraight = lAngle > 140.0;
+    this.isRightArmStraight = rAngle > 130.0;
+    this.isLeftArmStraight = lAngle > 130.0;
 
-    if (this.isRightArmStraight && this.isLeftArmStraight) {
+    const bothStraight = this.isRightArmStraight && this.isLeftArmStraight;
+
+    if (bothStraight) {
+      this.frontBadFrameCount = 0;
       this.formFeedbackText = 'แขนตึงคู่! ค้างไว้...';
       if (this.frontStartTime === null) {
         this.frontStartTime = Date.now();
@@ -326,51 +335,41 @@ export class CPRPoseAnalyzer {
         }
       }
     } else {
-      this.resetFrontCountdown('กรุณาล็อกข้อศอกทั้งสองข้างให้ตรง (>140°)');
+      this.frontBadFrameCount++;
+      if (this.frontBadFrameCount > 10) {
+        this.resetFrontCountdown('กรุณาล็อกข้อศอกให้ตรง (>130°)');
+      }
     }
   }
 
   private runActiveCPR(pts: PoseLandmarks): void {
-    const rShoulder = pts.leftShoulder;
-    const rElbow = pts.leftElbow;
-    const rWrist = pts.leftWrist;
-    const lShoulder = pts.rightShoulder;
-    const lElbow = pts.rightElbow;
-    const lWrist = pts.rightWrist;
+    const rShoulder = pts.rightShoulder || pts.leftShoulder;
+    const rElbow = pts.rightElbow || pts.leftElbow;
+    const rWrist = pts.rightWrist || pts.leftWrist;
+    const lShoulder = pts.leftShoulder || pts.rightShoulder;
+    const lElbow = pts.leftElbow || pts.rightElbow;
+    const lWrist = pts.leftWrist || pts.rightWrist;
 
-    if (
-      !rShoulder ||
-      !rElbow ||
-      !rWrist ||
-      !lShoulder ||
-      !lElbow ||
-      !lWrist ||
-      rShoulder.conf <= 0.05 ||
-      rElbow.conf <= 0.05 ||
-      rWrist.conf <= 0.05 ||
-      lShoulder.conf <= 0.05 ||
-      lElbow.conf <= 0.05 ||
-      lWrist.conf <= 0.05
-    ) {
-      this.clearPoints('กำลังค้นหาผู้ใช้งาน (หันหน้าเข้ากล้อง)');
+    if (!rShoulder || !rElbow || !rWrist) {
+      this.clearPoints('กำลังค้นหาผู้ใช้งาน (ตรวจจับการกดหน้าอก)');
       return;
     }
 
     const rAngle = this.calculateAngle(rShoulder, rElbow, rWrist);
-    const lAngle = this.calculateAngle(lShoulder, lElbow, lWrist);
-    const midShoulderY = (rShoulder.y + lShoulder.y) / 2.0;
+    const lAngle = lShoulder && lElbow && lWrist ? this.calculateAngle(lShoulder, lElbow, lWrist) : rAngle;
+    const midShoulderY = lShoulder ? (rShoulder.y + lShoulder.y) / 2.0 : rShoulder.y;
 
-    this.rightShoulder = rShoulder;
-    this.rightElbow = rElbow;
-    this.rightWrist = rWrist;
-    this.leftShoulder = lShoulder;
-    this.leftElbow = lElbow;
-    this.leftWrist = lWrist;
+    this.rightShoulder = pts.rightShoulder;
+    this.rightElbow = pts.rightElbow;
+    this.rightWrist = pts.rightWrist;
+    this.leftShoulder = pts.leftShoulder;
+    this.leftElbow = pts.leftElbow;
+    this.leftWrist = pts.leftWrist;
 
-    this.isRightArmStraight = rAngle > 140.0;
-    this.isLeftArmStraight = lAngle > 140.0;
-    this.isArmStraight = this.isRightArmStraight && this.isLeftArmStraight;
-    this.formFeedbackText = this.isArmStraight ? 'แขนตึง: ยอดเยี่ยมทั้งสองข้าง' : '⚠️ แขนงอ! กรุณาล็อกข้อศอก';
+    this.isRightArmStraight = rAngle > 130.0;
+    this.isLeftArmStraight = lAngle > 130.0;
+    this.isArmStraight = this.isRightArmStraight || this.isLeftArmStraight;
+    this.formFeedbackText = this.isArmStraight ? 'แขนตึง: ยอดเยี่ยม' : '⚠️ แขนงอ! กรุณาล็อกข้อศอก';
 
     if (this.sessionType === 'training') {
       this.totalFrames += 1;
@@ -381,7 +380,7 @@ export class CPRPoseAnalyzer {
   }
 
   private detectCompressionFront(currentShoulderY: number): void {
-    const movementThreshold = 0.005;
+    const movementThreshold = 0.006;
     const now = Date.now();
 
     const lastPush = this.compressionTimestamps[this.compressionTimestamps.length - 1];
@@ -392,15 +391,17 @@ export class CPRPoseAnalyzer {
       this.isPushingDown = false;
     }
 
-    if (currentShoulderY < this.lastShoulderY - movementThreshold && !this.isPushingDown) {
+    // In natural Y coords, pressing down means Y INCREASES (towards bottom of screen)
+    if (currentShoulderY > this.lastShoulderY + movementThreshold && !this.isPushingDown) {
       this.isPushingDown = true;
-      this.currentCycleMinY = currentShoulderY;
+      this.currentCycleMinY = currentShoulderY; // peak depth
     } else if (this.isPushingDown) {
-      if (currentShoulderY < this.currentCycleMinY) {
+      if (currentShoulderY > this.currentCycleMinY) {
         this.currentCycleMinY = currentShoulderY;
       }
 
-      if (currentShoulderY > this.currentCycleMinY + movementThreshold) {
+      // Releasing back up means Y DECREASES below the peak depth
+      if (currentShoulderY < this.currentCycleMinY - movementThreshold) {
         this.isPushingDown = false;
         this.compressionTimestamps.push(now);
 

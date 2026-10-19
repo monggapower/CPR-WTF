@@ -112,13 +112,32 @@ export const HUDStep4HandPlacement: React.FC<HUDStep4HandPlacementProps> = ({
           </div>
         </div>
 
-        {/* Confirmation Button */}
-        <button
-          onClick={onConfirmStartCPR}
-          className="w-full sm:w-auto bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white font-black text-base px-10 py-3.5 rounded-2xl shadow-xl shadow-emerald-950/50 transition-all transform hover:-translate-y-0.5 active:translate-y-0 border border-emerald-400/40"
-        >
-          วางมือถูกต้องแล้ว — เริ่มกดหน้าอก 2 นาที ➔
-        </button>
+        {/* Interactive Sternum Placement Action */}
+        <div className="w-full flex flex-col items-center gap-2">
+          {!checkedTarget && (
+            <div className="bg-amber-500/20 border border-amber-400/40 text-amber-200 text-xs px-4 py-1.5 rounded-full animate-bounce font-semibold">
+              👆 แตะที่ <b>"กรอบสีเขียว (ครึ่งล่างกระดูกอก)"</b> บนรูปภาพด้านบนเพื่อยืนยันตำแหน่ง
+            </div>
+          )}
+
+          {/* Confirmation Button */}
+          <button
+            onClick={() => {
+              if (checkedTarget) {
+                onConfirmStartCPR();
+              } else {
+                setCheckedTarget(true);
+              }
+            }}
+            className={`w-full sm:w-auto font-black text-sm sm:text-base px-8 py-3.5 rounded-2xl shadow-xl transition-all transform border ${
+              checkedTarget
+                ? 'bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white border-emerald-400/50 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer shadow-emerald-950/60'
+                : 'bg-slate-800 text-slate-400 border-white/10 cursor-pointer hover:bg-slate-750'
+            }`}
+          >
+            {checkedTarget ? '✓ ยืนยันตำแหน่งถูกต้อง — เริ่มกดหน้าอก ➔' : '👆 แตะเลือกตำแหน่งบนภาพ (หรือกดที่นี่เพื่อยืนยัน)'}
+          </button>
+        </div>
       </div>
     </div>
   );
