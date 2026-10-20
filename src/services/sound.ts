@@ -33,6 +33,23 @@ export class SoundFX {
     osc.stop(t + 0.16);
   }
 
+  /** Electronic audio beep (e.g. for AED lid open / button clicks) */
+  beep(freq = 520, duration = 0.06, type: OscillatorType = 'triangle'): void {
+    const ctx = this.ensure();
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t);
+    gain.gain.setValueAtTime(0.12, t);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + duration + 0.02);
+  }
+
   /** Two-note success chime */
   success(): void {
     const ctx = this.ensure();

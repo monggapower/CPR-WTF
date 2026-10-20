@@ -74,8 +74,12 @@ export const BLS3DScene: React.FC<BLS3DSceneProps> = ({
     aedStep: number;
     lidAngle: number;
     targetLidAngle: number;
+    lidOpen: boolean;
+    powerOn: boolean;
     snapPad1: () => void;
     snapPad2: () => void;
+    toggleLid: (forceOpen?: boolean | null) => void;
+    togglePower: (forceOn?: boolean | null) => void;
   }>({
     scene: null,
     camera: null,
@@ -112,8 +116,12 @@ export const BLS3DScene: React.FC<BLS3DSceneProps> = ({
     aedStep,
     lidAngle: 0,
     targetLidAngle: 0,
+    lidOpen: false,
+    powerOn: false,
     snapPad1: () => {},
     snapPad2: () => {},
+    toggleLid: () => {},
+    togglePower: () => {},
   });
 
   stateRef.current.mode = mode;
@@ -253,8 +261,8 @@ export const BLS3DScene: React.FC<BLS3DSceneProps> = ({
       ctx.textAlign = 'center';
       ctx.fillText('AED STANDBY', cvs.width / 2, 100);
       ctx.fillStyle = '#22c55e';
-      ctx.font = 'bold 19px sans-serif';
-      ctx.fillText('👉 กดปุ่มเปิดเครื่องสีเขียว (POWER)', cvs.width / 2, 140);
+      ctx.font = 'bold 18px sans-serif';
+      ctx.fillText('👉 เปิดฝาครอบเครื่อง AED หรือกดปุ่ม POWER', cvs.width / 2, 140);
     } else if (step === 1 || step === 2) {
       // Pad placement
       ctx.fillStyle = '#38bdf8';
@@ -297,15 +305,15 @@ export const BLS3DScene: React.FC<BLS3DSceneProps> = ({
       ctx.textAlign = 'left';
       ctx.fillText('RHYTHM: Ventricular Fibrillation (VF)', 14, 220);
     } else if (step === 4) {
-      // Safety Clearance ("ผมถอย คุณถอย ทุกคนถอย")
+      // Safety Clearance
       ctx.fillStyle = '#f97316';
       ctx.font = 'bold 22px sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText('⚡ SHOCK ADVISED • CHARGING 360J', cvs.width / 2, 75);
 
       ctx.fillStyle = '#fef08a';
-      ctx.font = 'bold 20px sans-serif';
-      ctx.fillText('🗣️ "ผมถอย คุณถอย ทุกคนถอย"', cvs.width / 2, 120);
+      ctx.font = 'bold 19px sans-serif';
+      ctx.fillText('⚠️ แนะนำให้ช็อก! ถอยห่างจากตัวผู้ป่วย', cvs.width / 2, 120);
 
       ctx.fillStyle = '#e2e8f0';
       ctx.font = '14px sans-serif';
@@ -855,6 +863,27 @@ export const BLS3DScene: React.FC<BLS3DSceneProps> = ({
     S.snapPad1 = snapPad1ToTarget;
     S.snapPad2 = snapPad2ToTarget;
 
+    // Standard clinical design: AED activates upon opening lid
+    const togglePower = (forceOn: boolean | null = null) => {
+      S.powerOn = forceOn !== null ? forceOn : !S.powerOn;
+      if (S.powerOn && S.aedStep === 0) {
+        onAdvanceAED(1);
+      }
+    };
+
+    const toggleLid = (forceOpen: boolean | null = null) => {
+      S.lidOpen = forceOpen !== null ? forceOpen : !S.lidOpen;
+      sound.beep(520, 0.06, 'triangle');
+      S.targetLidAngle = S.lidOpen ? -Math.PI * 0.65 : 0;
+      // Automatically power on AED when protective cover is opened (standard clinical design)
+      if (S.lidOpen && !S.powerOn) {
+        togglePower(true);
+      }
+    };
+
+    S.toggleLid = toggleLid;
+    S.togglePower = togglePower;
+
     // Animation Render Loop
     const animate = () => {
       S.animId = requestAnimationFrame(animate);
@@ -975,21 +1004,25 @@ export const BLS3DScene: React.FC<BLS3DSceneProps> = ({
       } else if (currentMode === 'aedScenario') {
         const step = S.aedStep;
 
-        // Clicking the lid opens it and turns on the AED
-        if (S.lidMesh && step === 0) {
-          const hits = S.raycaster.intersectObject(S.lidMesh, false);
+        // 1. Activate AED with opening the lid (clicks anywhere on protective lid cover or emblem)
+        if (S.lidPivot) {
+          const hits = S.raycaster.intersectObjects(S.lidPivot.children, true);
           if (hits.length > 0) {
-            S.targetLidAngle = -Math.PI * 0.65;
-            onAdvanceAED(1);
+            toggleLid(step === 0 ? true : null);
             return;
           }
         }
 
-        if (step === 0 && S.powerBtn) {
+        // 2. Power Button click
+        if (S.powerBtn) {
           const hits = S.raycaster.intersectObject(S.powerBtn, false);
           if (hits.length > 0) {
-            S.targetLidAngle = -Math.PI * 0.65;
-            onAdvanceAED(1);
+            if (!S.lidOpen) {
+              toggleLid(true);
+            } else {
+              togglePower(true);
+            }
+            return;
           }
         } else if (step === 1 && S.pad1Drag && S.pad1Target) {
           const hits = S.raycaster.intersectObjects([S.pad1Drag, S.pad1Target], false);
@@ -1148,9 +1181,13 @@ export const BLS3DScene: React.FC<BLS3DSceneProps> = ({
       if (aedStep === 0) {
         // AED off, lid closed
         S.targetLidAngle = 0;
+        S.lidOpen = false;
+        S.powerOn = false;
       } else {
         // AED on, lid open
         S.targetLidAngle = -Math.PI * 0.65;
+        S.lidOpen = true;
+        S.powerOn = true;
         if (S.pad1Drag) S.pad1Drag.visible = true;
         if (S.pad2Drag) S.pad2Drag.visible = true;
         if (S.cable1) S.cable1.visible = true;

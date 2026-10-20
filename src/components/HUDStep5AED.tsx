@@ -22,11 +22,11 @@ export const HUDStep5AED: React.FC<HUDStep5AEDProps> = ({
 
   // Updated steps without connecting wire (pre-connected pads)
   const stepMessages: Record<number, string> = {
-    0: '👆 ขั้นตอนที่ 1/5: แตะปุ่มเปิดเครื่องสีเขียว (POWER) บนตัวเครื่อง 3D AED',
+    0: '👆 ขั้นตอนที่ 1/5: เปิดฝาเครื่อง AED เพื่อเปิดใช้งานอัตโนมัติ (หรือคลิกที่ฝาเครื่อง / ปุ่ม POWER บนโมเดล 3D)',
     1: '✋ ขั้นตอนที่ 2/5: ลาก "แผ่นนำไฟฟ้าที่ 1" ไปวางที่กรอบสีฟ้า "หน้าอกขวาบน (ใต้กระดูกไหปลาร้า)"',
     2: '✋ ขั้นตอนที่ 3/5: ลาก "แผ่นนำไฟฟ้าที่ 2" ไปวางที่กรอบสีฟ้า "ชายโครงซ้ายล่าง (ใต้ราวนม)"',
     3: '⏳ ขั้นตอนที่ 4/5: เครื่อง AED กำลังวิเคราะห์คลื่นหัวใจอัตโนมัติ... ห้ามสัมผัสตัวผู้ป่วย!',
-    4: '🗣️ ขั้นตอนที่ 5/5: แนะนำให้ช็อก! พูดเตือนรอบข้าง: "ผมถอย คุณถอย ทุกคนถอย" (หรือ "ฉันถอย...")',
+    4: '🗣️ ขั้นตอนที่ 5/5: แนะนำให้ช็อก! กำลังชาร์จพลังงาน... ถอยห่างจากตัวผู้ป่วย (พูดเตือน "ผมถอย คุณถอย ทุกคนถอย")',
     5: '⚡ ทุกคนถอยปลอดภัยแล้ว! แตะที่ "ปุ่ม SHOCK สีส้มกระพริบ" บนตัวเครื่อง 3D AED เพื่อปล่อยไฟฟ้า',
     6: '✅ ทำการช็อกไฟฟ้าสำเร็จ! ปล่อยพลังงานเข้าสู่หัวใจ กำลังเข้าสู่หน้าสรุปผล...',
   };
@@ -93,7 +93,7 @@ export const HUDStep5AED: React.FC<HUDStep5AEDProps> = ({
                 : 'bg-white/5 border-white/10 text-slate-400'
             }`}
           >
-            1. เปิดเครื่อง {aedStep > 0 ? '✓' : ''}
+            1. เปิดฝาเครื่อง (Auto-ON) {aedStep > 0 ? '✓' : ''}
           </span>
           <span
             className={`px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-semibold border transition-all ${
@@ -170,13 +170,13 @@ export const HUDStep5AED: React.FC<HUDStep5AEDProps> = ({
         {/* Interactive Controls (collapsed when user wants clean 3D view) */}
         {!isCollapsed && (
           <div className="mt-2 pt-1.5 border-t border-white/10 flex flex-col items-center gap-2">
-            {/* Step 0: Power Button */}
+            {/* Step 0: Open Lid / Power Button */}
             {aedStep === 0 && (
               <button
                 onClick={() => onAdvanceStep(1)}
-                className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm py-1.5 px-6 rounded-xl shadow-lg transition-all"
+                className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm py-1.5 px-6 rounded-xl shadow-lg transition-all flex items-center gap-1.5"
               >
-                ⏻ แตะเปิดเครื่อง AED (หรือคลิกปุ่มเขียวบน 3D)
+                <span>🔓 เปิดฝาครอบเครื่อง AED (เครื่องเปิดทำงานอัตโนมัติ) / แตะปุ่ม POWER</span>
               </button>
             )}
 
